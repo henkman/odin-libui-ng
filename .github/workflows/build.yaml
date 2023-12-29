@@ -1,0 +1,116 @@
+name: build
+on:
+  push:
+    branches: [ "build-libui-ng" ]
+  pull_request:
+    branches: [ "build-libui-ng" ]
+jobs:
+  meson-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        arch: [x64]
+        libtype: [static]
+        buildtype: [release]
+    runs-on: ${{ matrix.os }}
+    name: Ubuntu-${{ matrix.arch }}-${{ matrix.libtype }}
+    steps:
+      - name: Install Meson and Linux Deps
+        run: |
+          python3 -m pip install --upgrade pip setuptools wheel
+          pip3 install meson ninja
+          sudo apt-get update -y
+          sudo apt-get install -y libgtk-3-dev xvfb
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: 'true'
+      - name: Meson Setup Build
+        working-directory: ./libui-ng
+        run: meson setup builddir --buildtype=${{ matrix.buildtype }} --default-library=${{ matrix.libtype }}
+      - name: Ninja Build
+        working-directory: ./libui-ng
+        run: ninja -C builddir
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: Ubuntu-${{ matrix.arch }}-${{ matrix.libtype }}-${{ matrix.buildtype }}
+          path: |
+            libui-ng/builddir/meson-out/libui.a
+
+  meson-windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest]
+        arch: [x64]
+        libtype: [static]
+        buildtype: [release]
+    runs-on: ${{ matrix.os }}
+    name: Win-${{ matrix.arch }}-${{ matrix.libtype }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: 'true'
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+      - name: Install Meson+Ninja
+        run: |
+          python -m pip install --upgrade pip
+          pip install meson ninja
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.arch }}
+
+      - name: Meson Setup Build
+        working-directory: ./libui-ng
+        shell: cmd
+        run: meson setup builddir --buildtype=${{ matrix.buildtype }} --default-library=${{ matrix.libtype }}
+      - name: Ninja Build
+        working-directory: ./libui-ng
+        run: ninja -C builddir
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: Win-${{ matrix.arch }}-${{ matrix.libtype }}-${{ matrix.buildtype }}
+          path: |
+            libui-ng/builddir/meson-out/libui.a
+
+  meson-macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest]
+        libtype: [static]
+        buildtype: [release]
+    runs-on: ${{ matrix.os }}
+    name: macOS-x64-${{ matrix.libtype }}
+    steps:
+      - name: Unbreak Python in Github Actions
+        run: |
+          find /usr/local/bin -lname '*/Library/Frameworks/Python.framework/*' -delete
+          sudo rm -rf /Library/Frameworks/Python.framework/
+          brew install --force python3 && brew unlink python3 && brew unlink python3 && brew link --overwrite python3
+      - name: Install Meson and macOS Deps
+        run: |
+          brew update
+          brew install meson ninja
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: 'true'
+      - name: Meson Setup Build
+        working-directory: ./libui-ng
+        run: meson setup builddir --buildtype=${{ matrix.buildtype }} --default-library=${{ matrix.libtype }}
+      - name: Ninja Build
+        working-directory: ./libui-ng
+        run: ninja -C builddir
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: macOS-x64-${{ matrix.libtype }}-${{ matrix.buildtype }}
+          path: |
+            libui-ng/builddir/meson-out/libui.a
